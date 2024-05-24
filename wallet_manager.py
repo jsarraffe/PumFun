@@ -58,7 +58,7 @@ class WalletManager:
             ]
         }
 
-        response = requests.post(url, json=payload, headers=headers)   
+        response = requests.post(url, json=payload, headers=headers)
         if response.status_code == 200:
             try:
                 result = response.json()["result"]["value"]
@@ -76,10 +76,83 @@ class WalletManager:
             print(f"Error: {response.status_code} - {response.text}")
             return None
 
+    def get_quote(self, quote_type, mint, amount, slippage):
+        url_quote = "https://pumpapi.fun/api/quote"
+        payload_quote = {
+            "quote_type": quote_type,
+            "mint": mint,
+            "amount": amount,
+            "slippage": slippage
+        }
+        response = requests.post(url_quote, json=payload_quote)
+        if response.status_code == 200:
+            quote_data = response.json()
+            print(f"Quote: {quote_data}")
+            return quote_data
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+            return None
+
+    def perform_buy_trade(self, mint, amount_in_sol, slippage, priority_fee, wallet_private_key):
+        
+     
+        url = "https://pumpapi.fun/api/trade"
+        payload = {
+            "trade_type": "buy",                    # Buy or sell 
+            "mint": fr"{mint}",            # Token mint address
+            "amount": 0.01,                         # Amount in SOL , if buying or of tokens if selling.
+            "slippage": 5,                          # Desired slippage 
+            "priorityFee": 0.003,                   # Value in SOL
+            "userPrivateKey": fr"{wallet_private_key}"   # Wallet private key 
+        }
+
+        response = requests.post(url, json=payload)
+
+        if response.status_code == 200:
+            transaction_id = response.json()["tx_hash"]
+            print(f"Transaction ID: {transaction_id}")
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+
+
+
+    def perform_sell_trade(self, wallet_address, mint_address, percentage, slippage):
+        balance_in_tokens = self.get_token_balance(wallet_address, mint_address)
+        if balance_in_tokens is None:
+            print("Failed to retrieve balance.")
+            return None
+
+        amount_to_sell = balance_in_tokens * (percentage / 100)
+        print(f"Amount to sell in tokens: {amount_to_sell}")
+
+        quote = self.get_quote("sell", mint_address, amount_to_sell, slippage)
+        if quote is None:
+            print("Failed to get a valid sell quote.")
+            return None
+
+        url_trade = "https://pumpapi.fun/api/trade"
+        payload_trade = {
+            "trade_type": "sell",
+            "mint": mint_address,
+            "amount": amount_to_sell,
+            "slippage": slippage,
+            "priorityFee": 0.003,
+            "userPrivateKey": self.keys[wallet_address]
+        }
+
+        response_trade = requests.post(url_trade, json=payload_trade)
+        if response_trade.status_code == 200:
+            trade_data = response_trade.json()
+            print(f"Sell Transaction ID: {trade_data['tx_hash']}")
+            return trade_data
+        else:
+            print(f"Error executing sell trade: {response_trade.status_code} - {response_trade.text}")
+            return None
+
     def transfer_sol(self, from_private_key, to_public_key, amount_sol):
         from_keypair = Keypair.from_secret_key(base58.b58decode(from_private_key))
         to_pubkey = PublicKey(to_public_key)
-        amount_lamports = int(amount_sol * 1e9)  # Convert SOL to lamports
+        amount_lamports = int(amount_sol * 1e9)
 
         transaction = Transaction()
         transaction.add(
@@ -109,7 +182,7 @@ class WalletManager:
                     print(f"Top up {name} ({public_key}): Successful, Transaction ID: {result}")
                 else:
                     print(f"Top up {name} ({public_key}): Failed")
-                await asyncio.sleep(2)  # Adding delay to handle rate limits
+                await asyncio.sleep(2)
 
     def print_public_keys(self):
         for name, public_key in self.public_keys.items():
@@ -119,8 +192,22 @@ class WalletManager:
 if __name__ == "__main__":
     wallet_manager = WalletManager()
 
-    # Print public keys
-    wallet_manager.print_public_keys()
 
-    # Top up all bot wallets with 0.001 SOL
-    asyncio.run(wallet_manager.top_up_bot_wallets(0.001))
+    # wallet_manager.top_up_bot_wallets(0.01)
+
+    # Perform buy trade for 0.01 SOL of DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev
+    mint_address = "DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev"
+    amount_in_sol = 0.01
+    slippage = 5
+    priority_fee = 0.003
+
+    key_name = 'PRIVATE_KEY3'
+    print(f"Buying with {key_name}...")
+
+    
+    trade_result = wallet_manager.perform_buy_trade(mint_address, amount_in_sol, slippage, priority_fee, wallet_manager.keys[key_name])
+    
+    if trade_result:
+        print(f"Trade successful for {key_name}: {trade_result}")
+    else:
+        print(f"Trade failed for {key_name}")
