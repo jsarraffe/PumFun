@@ -1,6 +1,7 @@
 import os
 import base58
 import requests
+import time
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.api import Client
@@ -129,46 +130,31 @@ class WalletManager:
             return None
 
     def transfer_all_tokens_back_to_head_huncho(self, mint_address):
-        head_huncho_public_key = self.get_public_key_from_private(self.keys['HEAD_HUNCHO_PRIVATE_KEY'])
+        head_huncho_private_key = self.keys['HEAD_HUNCHO_PRIVATE_KEY']
+        head_huncho_public_key = self.get_public_key_from_private(head_huncho_private_key)
         for name, private_key_str in self.keys.items():
             if name != 'HEAD_HUNCHO_PRIVATE_KEY':
                 public_key = self.get_public_key_from_private(private_key_str)
                 balance_in_tokens = self.get_token_balance(str(public_key), mint_address)
                 if balance_in_tokens and balance_in_tokens > 0:
-                    print(f"Transferring {balance_in_tokens} tokens from {name} ({public_key}) to Head Huncho")
-                    transfer_result = self.transfer_tokens(private_key_str, head_huncho_public_key, mint_address, balance_in_tokens)
+                    mint_decimals = self.get_mint_decimals(mint_address)
+                    balance_in_atomic_units = int(balance_in_tokens * (10 ** mint_decimals))
+                    print(f"Transferring {balance_in_atomic_units} atomic units from {public_key} to Head Huncho ({head_huncho_public_key})")
+                    transfer_result = self.transfer_tokens(private_key_str, head_huncho_public_key, mint_address, balance_in_atomic_units)
                     if transfer_result:
                         print(f"Transfer from {name} ({public_key}) to Head Huncho: Successful, Transaction ID: {transfer_result}")
                     else:
                         print(f"Error executing token transfer from {name} ({public_key})")
+                # Add a delay to avoid rate limiting
+                time.sleep(5)
 
     def print_public_keys(self):
         for name, public_key in self.public_keys.items():
             print(f"{name}: {public_key}")
 
 # Sample usage
-# Sample usage
-# Sample usage
 if __name__ == "__main__":
     wallet_manager = WalletManager()
 
     mint_address = "DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev"  # Replace with your mint address
-
-    from_private_key = "3CuaoY1Bb2NKipfSGenpvTWeXWd9iC1UvxtNrce5JU6x3LYF6kyYLm82jkpf55v9tchB8Ukk2cGeTmSnxygEK6vY"  # Replace with your private key
-    head_huncho_private_key = wallet_manager.keys['HEAD_HUNCHO_PRIVATE_KEY']
-    head_huncho_public_key = wallet_manager.get_public_key_from_private(head_huncho_private_key)
-
-    from_public_key = wallet_manager.get_public_key_from_private(from_private_key)
-    balance_in_tokens = wallet_manager.get_token_balance(str(from_public_key), mint_address)
-
-    if balance_in_tokens and balance_in_tokens > 0:
-        mint_decimals = wallet_manager.get_mint_decimals(mint_address)
-        balance_in_atomic_units = int(balance_in_tokens * (10 ** mint_decimals))
-        print(f"Transferring {balance_in_atomic_units} atomic units from {from_public_key} to Head Huncho ({head_huncho_public_key})")
-        transfer_result = wallet_manager.transfer_tokens(from_private_key, head_huncho_public_key, mint_address, balance_in_atomic_units)
-        if transfer_result:
-            print(f"Transfer successful: {transfer_result}")
-        else:
-            print("Transfer failed")
-    else:
-        print("No tokens to transfer")
+    wallet_manager.transfer_all_tokens_back_to_head_huncho(mint_address)

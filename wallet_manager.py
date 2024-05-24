@@ -1,12 +1,16 @@
 import os
 import base58
+import requests
+import time
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.api import Client
 from solana.transaction import Transaction
+from solana.system_program import transfer, TransferParams
 from spl.token.constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
 from spl.token.instructions import transfer_checked, TransferCheckedParams
 from dotenv import load_dotenv
+import asyncio
 
 def get_associated_token_address(wallet_address, token_mint_address):
     """Get the associated token address for a wallet and mint."""
@@ -135,14 +139,14 @@ class WalletManager:
                 if balance_in_tokens and balance_in_tokens > 0:
                     mint_decimals = self.get_mint_decimals(mint_address)
                     balance_in_atomic_units = int(balance_in_tokens * (10 ** mint_decimals))
-                    print(f"Transferring {balance_in_atomic_units} tokens from {name} ({public_key}) to Head Huncho ({head_huncho_public_key})")
+                    print(f"Transferring {balance_in_atomic_units} atomic units from {public_key} to Head Huncho ({head_huncho_public_key})")
                     transfer_result = self.transfer_tokens(private_key_str, head_huncho_public_key, mint_address, balance_in_atomic_units)
                     if transfer_result:
-                        print(f"Transfer successful for {name}: {transfer_result}")
+                        print(f"Transfer from {name} ({public_key}) to Head Huncho: Successful, Transaction ID: {transfer_result}")
                     else:
-                        print(f"Transfer failed for {name}")
-                else:
-                    print(f"No tokens to transfer for {name} ({public_key})")
+                        print(f"Error executing token transfer from {name} ({public_key})")
+                # Add a delay to avoid rate limiting
+                time.sleep(5)
 
     def print_public_keys(self):
         for name, public_key in self.public_keys.items():
@@ -152,6 +156,5 @@ class WalletManager:
 if __name__ == "__main__":
     wallet_manager = WalletManager()
 
-    # Transfer all tokens back to head huncho
     mint_address = "DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev"  # Replace with your mint address
     wallet_manager.transfer_all_tokens_back_to_head_huncho(mint_address)
