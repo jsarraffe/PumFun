@@ -1,14 +1,20 @@
 import os
 import base58
-import requests
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.api import Client
-from solana.rpc.commitment import Confirmed
 from solana.transaction import Transaction
-from solana.system_program import transfer, TransferParams
+from spl.token.constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
+from spl.token.instructions import transfer_checked, TransferCheckedParams
 from dotenv import load_dotenv
-import asyncio
+import requests
+
+def get_associated_token_address(wallet_address, token_mint_address):
+    """Get the associated token address for a wallet and mint."""
+    return PublicKey.find_program_address(
+        [bytes(wallet_address), bytes(TOKEN_PROGRAM_ID), bytes(token_mint_address)],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+    )[0]
 
 class WalletManager:
     def __init__(self, env_file='wallet_keys.env'):
@@ -111,8 +117,11 @@ class WalletManager:
         if response.status_code == 200:
             transaction_id = response.json()["tx_hash"]
             print(f"Transaction ID: {transaction_id}")
+            return True
         else:
+            
             print(f"Error: {response.status_code} - {response.text}")
+            return False
 
 
 
@@ -188,26 +197,81 @@ class WalletManager:
         for name, public_key in self.public_keys.items():
             print(f"{name}: {public_key}")
 
+
+    def get_mint_decimals(self, mint_address):
+        mint_pubkey = PublicKey(mint_address)
+        mint_info = self.client.get_token_supply(mint_pubkey)
+        if 'result' in mint_info:
+            return mint_info['result']['value']['decimals']
+        else:
+            raise Exception(f"Failed to get mint decimals for {mint_address}")
+
+    def transfer_tokens(self, from_private_key, to_public_key, mint_address, amount):
+        from_keypair = Keypair.from_secret_key(base58.b58decode(from_private_key))
+        from_pubkey = from_keypair.public_key
+        to_pubkey = PublicKey(to_public_key)
+        mint_pubkey = PublicKey(mint_address)
+        
+        # Get associated token accounts
+        from_token_account = get_associated_token_address(from_pubkey, mint_pubkey)
+        to_token_account = get_associated_token_address(to_pubkey, mint_pubkey)
+        
+        # Get the mint decimals
+        mint_decimals = self.get_mint_decimals(mint_address)
+
+        transaction = Transaction()
+        transaction.add(
+            transfer_checked(
+                TransferCheckedParams(
+                    program_id=TOKEN_PROGRAM_ID,
+                    source=from_token_account,
+                    mint=mint_pubkey,
+                    dest=to_token_account,
+                    owner=from_pubkey,
+                    amount=amount,
+                    decimals=mint_decimals
+                )
+            )
+        )
+
+        response = self.client.send_transaction(transaction, from_keypair)
+        if response.get('result'):
+            print(f"Transaction successful: {response['result']}")
+            return response['result']
+        else:
+            print(f"Transaction failed: {response}")
+            return None
+
+
 # Sample usage
 if __name__ == "__main__":
     wallet_manager = WalletManager()
 
+    # Transfer tokens from PRIVATE_KEY2 to HEAD_HUNCHO_PRIVATE_KEY
+    # from_key = wallet_manager.keys['PRIVATE_KEY2']
+    # to_pubkey = wallet_manager.public_keys['HEAD_HUNCHO_PRIVATE_KEY']
+    # mint_address = "DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev"  # Replace with your mint address
+    # amount = 1000  # Amount in the token's smallest unit
 
-    # wallet_manager.top_up_bot_wallets(0.01)
+    # transfer_result = wallet_manager.transfer_tokens(from_key, to_pubkey, mint_address, amount)
+    
+    # if transfer_result:
+    #     print(f"Transfer successful: {transfer_result}")
+    # else:
+    #     print("Transfer failed")
 
-    # Perform buy trade for 0.01 SOL of DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev
+
+     #Perform buy trade for 0.01 SOL of DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev
     mint_address = "DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev"
     amount_in_sol = 0.01
     slippage = 5
     priority_fee = 0.003
 
-    key_name = 'PRIVATE_KEY3'
-    print(f"Buying with {key_name}...")
-
-    
-    trade_result = wallet_manager.perform_buy_trade(mint_address, amount_in_sol, slippage, priority_fee, wallet_manager.keys[key_name])
-    
-    if trade_result:
-        print(f"Trade successful for {key_name}: {trade_result}")
-    else:
-        print(f"Trade failed for {key_name}")
+    for key_name in ['PRIVATE_KEY2', 'PRIVATE_KEY3', 'PRIVATE_KEY4', 'PRIVATE_KEY5', 'PRIVATE_KEY6', 'PRIVATE_KEY7', 'PRIVATE_KEY8']:
+        private_key = wallet_manager.keys[key_name]
+        print(f"Buying with {key_name}...")
+        trade_result = wallet_manager.perform_buy_trade(mint_address, amount_in_sol, slippage, priority_fee, private_key)
+        if trade_result:
+            print(f"Trade successful for {key_name}: {trade_result}")
+        else:
+            print(f"Trade failed for {key_name}")

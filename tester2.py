@@ -1,13 +1,16 @@
 import os
 import base58
+import requests
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.api import Client
+from solana.rpc.commitment import Confirmed
 from solana.transaction import Transaction
-from spl.token.constants import TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID
-from spl.token.instructions import transfer_checked, TransferCheckedParams
+from solana.system_program import transfer, TransferParams
 from dotenv import load_dotenv
-import requests
+import asyncio
+
+
 
 def get_associated_token_address(wallet_address, token_mint_address):
     """Get the associated token address for a wallet and mint."""
@@ -243,25 +246,21 @@ class WalletManager:
             return None
 
 
+
+
+
+    
 # Sample usage
 if __name__ == "__main__":
     wallet_manager = WalletManager()
 
-    # Transfer tokens from PRIVATE_KEY2 to HEAD_HUNCHO_PRIVATE_KEY
-    # from_key = wallet_manager.keys['PRIVATE_KEY2']
-    # to_pubkey = wallet_manager.public_keys['HEAD_HUNCHO_PRIVATE_KEY']
-    # mint_address = "DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev"  # Replace with your mint address
-    # amount = 1000  # Amount in the token's smallest unit
+    # Print public keys
+    wallet_manager.print_public_keys()
 
-    # transfer_result = wallet_manager.transfer_tokens(from_key, to_pubkey, mint_address, amount)
-    
-    # if transfer_result:
-    #     print(f"Transfer successful: {transfer_result}")
-    # else:
-    #     print("Transfer failed")
+    # Top up all bot wallets with 0.01 SOL if needed
+    asyncio.run(wallet_manager.top_up_bot_wallets(0.01))
 
-
-     #Perform buy trade for 0.01 SOL of DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev
+    # Perform buy trade for 0.01 SOL of DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev
     mint_address = "DpbbGCQSxTrQc6jPAbSHzptnnr2FbowwJGWE3aevTbev"
     amount_in_sol = 0.01
     slippage = 5
@@ -275,3 +274,7 @@ if __name__ == "__main__":
             print(f"Trade successful for {key_name}: {trade_result}")
         else:
             print(f"Trade failed for {key_name}")
+
+    # # Transfer all tokens back to head huncho
+    # wallet_manager.transfer_all_tokens_back_to_head_huncho(mint_address)
+
